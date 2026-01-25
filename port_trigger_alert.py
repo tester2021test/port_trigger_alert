@@ -50,18 +50,11 @@ def calculate_rsi(close, period=14):
     return 100 - (100 / (1 + rs))
 
 def fetch_indicators(symbol):
-    df = yf.download(
-        symbol,
-        period="3mo",
-        interval="1d",
-        progress=False,
-        threads=False
-    )
+    df = yf.download(symbol, period="3mo", interval="1d", progress=False)
 
     if df.empty or len(df) < 50:
         return None
 
-    # 🔐 Fix for MultiIndex columns (GitHub Actions bug)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
@@ -76,10 +69,7 @@ def fetch_indicators(symbol):
         dma20 = float(last["DMA20"].iloc[0])
         dma50 = float(last["DMA50"].iloc[0])
         rsi = float(last["RSI"].iloc[0])
-    except (TypeError, ValueError):
-        return None
-
-    if pd.isna(price) or pd.isna(dma20) or pd.isna(dma50) or pd.isna(rsi):
+    except Exception:
         return None
 
     if price > dma20 > dma50:
@@ -91,21 +81,21 @@ def fetch_indicators(symbol):
 
     return price, dma20, dma50, rsi, trend
 
-# ================== CSV JOURNAL ==================
-def log_to_csv(symbol, name, level, price, qty, trend, rsi, dma20, dma50):
+# ================== CSV LOGGER (EVERY RUN) ==================
+def log_to_csv(symbol, name, price, trend, rsi, dma20, dma50, status):
     now = datetime.now(IST)
+
     row = {
         "Date": now.strftime("%Y-%m-%d"),
         "Time": now.strftime("%H:%M:%S"),
         "Symbol": symbol,
         "Stock Name": name,
-        "Level": level,
         "Price": round(price, 2),
-        "Quantity": qty,
         "Trend": trend,
         "RSI": round(rsi, 2),
         "20 DMA": round(dma20, 2),
-        "50 DMA": round(dma50, 2)
+        "50 DMA": round(dma50, 2),
+        "Status": status
     }
 
     df = pd.DataFrame([row])
@@ -117,11 +107,7 @@ def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     requests.post(
         url,
-        data={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "Markdown"
-        },
+        data={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"},
         timeout=10
     )
 
@@ -129,13 +115,11 @@ def send_telegram(message):
 def main():
     print("📡 Portfolio Trigger Alert – Run Started")
 
-    now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
-
     for symbol, data in PORTFOLIO.items():
         result = fetch_indicators(symbol)
 
         if result is None:
-            print(f"[{now}] {symbol} ⚠️ Data unavailable")
+            print(f"{symbol} ⚠️ Data unavailable")
             continue
 
         price, dma20, dma50, rsi, trend = result
@@ -153,23 +137,27 @@ def main():
                     f"*Level:* {idx}\n"
                     f"*Qty:* {qty}\n\n"
                     f"*Trend:* {trend}\n"
-                    f"*RSI:* {rsi:.1f}\n"
-                    f"*20 DMA:* ₹{dma20:.2f}\n"
-                    f"*50 DMA:* ₹{dma50:.2f}"
-                )
-
-                log_to_csv(
-                    symbol, data["name"], idx,
-                    price, qty, trend, rsi, dma20, dma50
+                    f"*RSI:* {rsi:.1f}"
                 )
                 break
 
-        print(
-            f"[{now}] {symbol} | ₹{price:.2f} | "
-            f"Trend: {trend} | RSI: {rsi:.1f} | Status: {status}"
+        # ✅ LOG EVERY SYMBOL EVERY RUN
+        log_to_csv(
+            symbol,
+            data["name"],
+            price,
+            trend,
+            rsi,
+            dma20,
+            dma50,
+            status
         )
 
-    print("✅ Run completed successfully")
+        print(
+            f"{symbol} | ₹{price:.2f} | Trend: {trend} | RSI: {rsi:.1f} | Status: {status}"
+        )
+
+    print("✅ Run completed")
 
 if __name__ == "__main__":
     main()
