@@ -10,68 +10,35 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    raise RuntimeError("❌ Telegram secrets not found in environment variables")
+    raise RuntimeError("❌ Telegram secrets missing")
 
 IST = pytz.timezone("Asia/Kolkata")
 CSV_FILE = "trade_journal.csv"
 
 # ================== PORTFOLIO ==================
 PORTFOLIO = {
-    "DIVOPPBEES.NS": {
-        "name": "Nippon India ETF Dividend Opportunities",
-        "type": "ETF",
-        "levels": [(78, 79, 25), (74, 75, 35)]
-    },
-    "HEALTHY.NS": {
-        "name": "BSL Nifty HealthCare ETF",
-        "type": "ETF",
-        "levels": [(13.8, 14.0, 100), (12.8, 13.2, 150)]
-    },
-    "MAHKTECH.NS": {
-        "name": "Mahktech",
-        "type": "STOCK",
-        "levels": [(25.5, 26.0, 150), (23.0, 24.0, 200)]
-    },
-    "IRCTC.NS": {
-        "name": "IRCTC",
-        "type": "STOCK",
-        "levels": [(560, 580, 8), (500, 520, 10)]
-    },
-    "TATAGOLD.NS": {
-        "name": "Tata Gold ETF",
-        "type": "ETF",
-        "levels": [(14.5, 14.6, 300), (13.8, 14.0, 400), (12.8, 13.2, 500)]
-    },
-    "EVINDIA.NS": {
-        "name": "EVINDIA ETF",
-        "type": "ETF",
-        "levels": [(28.0, 28.5, 100), (26.0, 26.5, 150), (23.5, 24.0, 200)]
-    },
-    "GAIL.NS": {
-        "name": "GAIL",
-        "type": "STOCK",
-        "levels": [(150, 152, 50), (138, 142, 70), (125, 130, 80)]
-    },
-    "IOB.NS": {
-        "name": "Indian Overseas Bank",
-        "type": "STOCK",
-        "levels": [(32, 33, 40), (28, 29, 60), (24, 25, 50)]
-    },
-    "TMPV.NS": {
-        "name": "Tata Motors Passenger Vehicles Ltd",
-        "type": "STOCK",
-        "levels": [(330, 335, 6), (300, 310, 10), (270, 280, 10)]
-    },
-    "GROWWRLTY.NS": {
-        "name": "Groww Nifty Realty ETF",
-        "type": "ETF",
-        "levels": [(8.0, 8.2, 70), (7.2, 7.4, 100), (6.2, 6.5, 100)]
-    },
-    "CESC.NS": {
-        "name": "CESC",
-        "type": "STOCK",
-        "levels": [(132, 135, 15), (120, 125, 20), (105, 110, 15)]
-    }
+    "DIVOPPBEES.NS": {"name": "Nippon India ETF Dividend Opportunities", "type": "ETF",
+                      "levels": [(78, 79, 25), (74, 75, 35)]},
+    "HEALTHY.NS": {"name": "BSL Nifty HealthCare ETF", "type": "ETF",
+                   "levels": [(13.8, 14.0, 100), (12.8, 13.2, 150)]},
+    "MAHKTECH.NS": {"name": "Mahktech", "type": "STOCK",
+                     "levels": [(25.5, 26.0, 150), (23.0, 24.0, 200)]},
+    "IRCTC.NS": {"name": "IRCTC", "type": "STOCK",
+                 "levels": [(560, 580, 8), (500, 520, 10)]},
+    "TATAGOLD.NS": {"name": "Tata Gold ETF", "type": "ETF",
+                    "levels": [(14.5, 14.6, 300), (13.8, 14.0, 400), (12.8, 13.2, 500)]},
+    "EVINDIA.NS": {"name": "EVINDIA ETF", "type": "ETF",
+                   "levels": [(28.0, 28.5, 100), (26.0, 26.5, 150), (23.5, 24.0, 200)]},
+    "GAIL.NS": {"name": "GAIL", "type": "STOCK",
+                "levels": [(150, 152, 50), (138, 142, 70), (125, 130, 80)]},
+    "IOB.NS": {"name": "Indian Overseas Bank", "type": "STOCK",
+               "levels": [(32, 33, 40), (28, 29, 60), (24, 25, 50)]},
+    "TMPV.NS": {"name": "Tata Motors Passenger Vehicles Ltd", "type": "STOCK",
+                "levels": [(330, 335, 6), (300, 310, 10), (270, 280, 10)]},
+    "GROWWRLTY.NS": {"name": "Groww Nifty Realty ETF", "type": "ETF",
+                     "levels": [(8.0, 8.2, 70), (7.2, 7.4, 100), (6.2, 6.5, 100)]},
+    "CESC.NS": {"name": "CESC", "type": "STOCK",
+                "levels": [(132, 135, 15), (120, 125, 20), (105, 110, 15)]}
 }
 
 # ================== INDICATORS ==================
@@ -94,16 +61,26 @@ def fetch_indicators(symbol):
     if df.empty or len(df) < 50:
         return None
 
+    # 🔐 Fix for MultiIndex columns (GitHub Actions bug)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
     df["DMA20"] = df["Close"].rolling(20).mean()
     df["DMA50"] = df["Close"].rolling(50).mean()
     df["RSI"] = calculate_rsi(df["Close"])
 
-    last = df.iloc[-1]
+    last = df.tail(1)
 
-    price = float(last["Close"])
-    dma20 = float(last["DMA20"])
-    dma50 = float(last["DMA50"])
-    rsi = float(last["RSI"])
+    try:
+        price = float(last["Close"].iloc[0])
+        dma20 = float(last["DMA20"].iloc[0])
+        dma50 = float(last["DMA50"].iloc[0])
+        rsi = float(last["RSI"].iloc[0])
+    except (TypeError, ValueError):
+        return None
+
+    if pd.isna(price) or pd.isna(dma20) or pd.isna(dma50) or pd.isna(rsi):
+        return None
 
     if price > dma20 > dma50:
         trend = "Bullish"
@@ -148,7 +125,7 @@ def send_telegram(message):
         timeout=10
     )
 
-# ================== MAIN EXECUTION ==================
+# ================== MAIN ==================
 def main():
     print("📡 Portfolio Trigger Alert – Run Started")
 
