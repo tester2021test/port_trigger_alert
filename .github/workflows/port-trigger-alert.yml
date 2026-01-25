@@ -1,0 +1,40 @@
+name: Portfolio Trigger Alert
+
+on:
+  # Manual run from GitHub UI
+  workflow_dispatch:
+
+  # External trigger from cron-job.org
+  repository_dispatch:
+    types: [cron-trigger]
+
+jobs:
+  run-alert:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 5
+
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4️⃣ Run portfolio trigger script
+      - name: Run portfolio trigger alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python port_trigger_alert.py
