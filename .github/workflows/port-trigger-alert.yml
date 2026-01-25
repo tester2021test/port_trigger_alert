@@ -1,7 +1,7 @@
 name: Portfolio Trigger Alert
 
 on:
-  # Manual run from GitHub UI
+  # Manual trigger
   workflow_dispatch:
 
   # External trigger from cron-job.org
@@ -11,11 +11,10 @@ on:
 jobs:
   run-alert:
     runs-on: ubuntu-latest
-
     timeout-minutes: 5
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -37,3 +36,11 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python port_trigger_alert.py
+
+      # 5️⃣ Upload trade journal CSV (ALWAYS)
+      - name: Upload trade journal
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-journal
+          path: trade_journal.csv
