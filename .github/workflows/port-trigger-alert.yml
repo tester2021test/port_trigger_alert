@@ -1,10 +1,8 @@
 name: Portfolio Trigger Alert
 
 on:
-  # Manual trigger
   workflow_dispatch:
 
-  # External trigger from cron-job.org
   repository_dispatch:
     types: [cron-trigger]
 
@@ -14,9 +12,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repo (with full history)
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # IMPORTANT for git push
 
       # 2️⃣ Setup Python
       - name: Set up Python
@@ -29,7 +29,7 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      # 4️⃣ Run portfolio trigger script
+      # 4️⃣ Run alert script
       - name: Run portfolio trigger alert
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -37,10 +37,13 @@ jobs:
         run: |
           python port_trigger_alert.py
 
-      # 5️⃣ Upload trade journal CSV (ALWAYS)
-      - name: Upload trade journal
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: trade-journal
-          path: trade_journal.csv
+      # 5️⃣ Commit & push updated trade_journal.csv
+      - name: Commit updated trade journal
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git pull origin main
+          git add trade_journal.csv
+          git commit -m "Auto update trade journal [cron]" || echo "No changes to commit"
+          git push origin main
