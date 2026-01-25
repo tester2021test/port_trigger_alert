@@ -12,24 +12,24 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      # 1️⃣ Checkout repo (with full history)
+      # Checkout repo with full history for pushing
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # IMPORTANT for git push
+          fetch-depth: 0
 
-      # 2️⃣ Setup Python
+      # Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3️⃣ Install dependencies
+      # Install dependencies
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      # 4️⃣ Run alert script
+      # Run your script
       - name: Run portfolio trigger alert
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -37,13 +37,15 @@ jobs:
         run: |
           python port_trigger_alert.py
 
-      # 5️⃣ Commit & push updated trade_journal.csv
+      # Commit updated CSV back to repo
       - name: Commit updated trade journal
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
+          
           git pull origin main
           git add trade_journal.csv
           git commit -m "Auto update trade journal [cron]" || echo "No changes to commit"
-          git push origin main
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/tester2021test/port_trigger_alert.git main
